@@ -30,15 +30,10 @@ define(
 
 
             // loading each YouTube video ONLY when it's onscreen
+            // copying the source from the data-src attribute to the real "src" attribute
             $(".home-video").each(function () {
-
-
                 var $this = $(this);
-
-
                 tools.elementOnScreen($this, function () {
-
-                    // copying the source from the data-src attribute to the real "src" attribute
                     $this.attr("src", $this.data("src"));
                 });
             });
@@ -74,7 +69,7 @@ define(
 
                 // doing nothing if username or password is empty
                 if (!username || !password) {
-                    return;
+                    return false;
                 }
 
 
@@ -83,7 +78,7 @@ define(
 
 
                 // momentarily showing the login-spinny thing - purely for decoration, it's functionally meaningless
-                $("#login-loading").show();
+                $("#login-loading-gif").show();
                 $("#password-input").attr({disabled: true});
 
 
@@ -95,7 +90,7 @@ define(
 
 
                     // hiding the spinning gif, regardless of whether login has failed or not
-                    $("#login-loading").hide();
+                    $("#login-loading-gif").hide();
 
 
                     // if nothing was returned via JSON, meaning login failed...

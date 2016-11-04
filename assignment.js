@@ -65,8 +65,6 @@ requirejs(
                             lastDisplayedChatID = chat.id;
                             displayMessage(chat.message);
                         }
-
-
                     }).fail(function (d) {
                         console.log("Error?");
                         console.log(d);

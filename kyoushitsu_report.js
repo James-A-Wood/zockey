@@ -4,9 +4,10 @@
 define(
         [
             "jquery",
-            "helpers/chatManager"
+            "helpers/chatManager",
+            "helpers/replaceStraightQuotesWithSlanted"
         ],
-        function ($, myChatManager) {
+        function ($, myChatManager, replaceStraightQuotesWithSlanted) {
 
 
             var log = console.log;
@@ -26,6 +27,104 @@ define(
             var chatManager = myChatManager({
                 container: $("#chat-row")
             });
+
+
+            var blogManager = (function () {
+
+
+                var lastUploadedTitle = "";
+                var lastUploadedBody = "";
+
+
+                function noChanges() {
+                    var titleSame = $("#blog-title-input").val() === lastUploadedTitle;
+                    var bodySame = $("#blog-text").val() === lastUploadedBody;
+                    return titleSame && bodySame;
+                }
+
+
+                // focus on inputs resets the formatting
+                $("#blog-title-input, #blog-text").focus(function () {
+                    $("#blog-stuff").removeClass("uploaded");
+                    $("#blog-report").text("");
+                });
+
+
+                // wiring up the send button
+                $("#blog-send-button").click(function () {
+
+
+                    // handling quotes and trimming inputs
+                    replaceStraightQuotesWithSlanted($("#blog-title-input"));
+                    replaceStraightQuotesWithSlanted($("#blog-text"));
+
+
+                    // getting the values
+                    var title = $("#blog-title-input").val();
+                    var body = $("#blog-text").val();
+
+
+                    // exiting here if there are no changes since the last upload
+                    if (noChanges()) {
+                        console.log("No changes, so not uploading anything!");
+                        return false;
+                    }
+
+
+                    var data = {
+                        job: "upload_blog_entry",
+                        kyoushitsu: $("#kyoushitsu-selector").val(),
+                        title: title,
+                        body: body
+                    };
+
+
+                    $.post("/kyoushitsu_stuff", data, "json").done(function () {
+
+
+                        // setting formatting so we know we've uploaded stuff
+                        $("#blog-stuff").addClass("uploaded");
+                        $("#blog-report").text("Uploaded!");
+
+
+                        // keeping track of the changes
+                        lastUploadedBody = body;
+                        lastUploadedTitle = title;
+                    }).fail(function (d) {
+                        console.log(d);
+                    });
+                });
+
+
+                function getCurrentEntry() {
+
+
+                    var sendData = {
+                        job: "get_blog_entries",
+                        kyoushitsu: $("#kyoushitsu-selector").val()
+                    };
+
+
+                    $.getJSON("/kyoushitsu_stuff", sendData).done(function (d) {
+
+
+                        // putting text in the inputs
+                        d = d || {};
+                        $("#blog-title-input").val(d.title);
+                        $("#blog-text").val(d.body);
+
+
+                        // saving values so we can check for changes later
+                        lastUploadedTitle = d.title;
+                        lastUploadedBody = d.body;
+                    });
+                }
+
+
+                return {
+                    getCurrentEntry: getCurrentEntry
+                };
+            }());
 
 
             // NEW TEST
@@ -220,6 +319,10 @@ define(
 
                 // short-circuiting the default "submit" behavior
                 e.preventDefault();
+
+
+                // getting the last/current blog entry for this kyoushitsu
+                blogManager.getCurrentEntry();
 
 
                 // exiting here if no value has been selected

@@ -12,7 +12,7 @@ define(
         [
             "jquery",
             "tools",
-            "helpers/replaceStaightQuotesWithSlanted",
+            "helpers/replaceStraightQuotesWithSlanted",
             "helpers/playAudioOnClick",
             "jqueryui"
         ],
@@ -52,9 +52,6 @@ define(
 
                     // making the AJAX call
                     $.getJSON(url, sendData).done(function (d) {
-
-
-                        // building a new row for each item in the returned array
                         d.forEach(buildNewRow);
                     }).fail(function (d) {
                         console.log("Load error!");
@@ -83,7 +80,8 @@ define(
 
 
                     // adding the English text to the text input
-                    $newRow.find(".audio-name").find("input").val(thisAudio.name);
+//                    $newRow.find(".audio-name").find("input").val(thisAudio.name);
+                    $newRow.find(".audio-name").text(thisAudio.name);
 
 
                     // wiring up the delete button
@@ -122,28 +120,33 @@ define(
                     $newRow.find(".audio-name").dblclick(function () {
 
 
-                        var $input = $(this).find("input");
+                        var $thisCell = $(this);
+                        $thisCell.addClass("selected");
 
 
-                        $input.removeAttr("disabled").off("blur").on("blur", function () {
-                            $input.attr("disabled", true);
-                        });
+                        setTimeout(function () {
 
 
-                        $input.off("change").change(function () {
+                            // getting the new value, via prompt
+                            var newValue = window.prompt("New Value?", $thisCell.text());
+                            if (!newValue) {
+                                $thisCell.removeClass("selected");
+                            }
 
 
-                            $input.addClass("updating");
-
-
-                            replaceStraightQuotesWithSlanted($input);
-
-
-                            editText($input.val(), thisAudio, function (returnedText) {
-                                $input.val(returnedText).blur();
-                                $input.removeClass("updating");
+                            // calling the editText method
+                            editText({
+                                newValue: newValue,
+                                audio: thisAudio,
+                                onSuccess: function (returnedText) {
+                                    $thisCell.removeClass("updating selected").addClass("updated").text(returnedText);
+                                },
+                                onFail: function () {
+                                    $thisCell.removeClass("updating selected");
+                                    alert("Failed!");
+                                }
                             });
-                        });
+                        }, 50);
                     });
 
 
@@ -167,10 +170,18 @@ define(
                 }
 
 
-                function editText(newValue, thisAudio, callback) {
+                function editText(p) {
 
 
-                    if (!newValue || !thisAudio || !callback) {
+                    // anal
+                    var newValue = p.newValue,
+                            thisAudio = p.audio,
+                            onSuccess = p.onSuccess,
+                            onFail = p.onFail;
+
+
+                    // scrubbing arguments
+                    if (!newValue || !thisAudio || !onSuccess) {
                         return false;
                     }
 
@@ -178,10 +189,17 @@ define(
                     // trimming any white space, and seeing if we have anything leftover
                     newValue = newValue.trim();
                     if (!newValue) {
+                        onFail();
                         return;
                     }
 
 
+                    // replacing straight quotes with slanted
+                    newValue = newValue.replace(/\'/g, "’");
+                    newValue = newValue.replace(/\"/g, "”");
+
+
+                    // preparing the data
                     var sendData = {
                         job: "edit_text",
                         new_text: newValue,
@@ -190,7 +208,7 @@ define(
 
 
                     // making the ajax call
-                    $.post("/audio_manager_stuff", sendData).done(callback);
+                    $.post("/audio_manager_stuff", sendData).done(onSuccess).fail(onFail);
                 }
 
 

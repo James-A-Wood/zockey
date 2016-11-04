@@ -10,7 +10,7 @@ define(
             "helpers/ajaxNotifications",
             "helpers/ctrlIJKLswapsTextInput",
             "helpers/audioFileUploader",
-            "helpers/replaceStaightQuotesWithSlanted",
+            "helpers/replaceStraightQuotesWithSlanted",
             "helpers/playAudioOnClick",
             "jqueryui",
             "bootstrap"
@@ -126,7 +126,7 @@ define(
 
 
                             $("#all-problems-holder").addClass("words");
-                            $("#number-rows-to-show").val(2).trigger("change").attr({disabled: true});
+                            $("#number-rows-to-show").val(2).trigger("change");//.attr({disabled: true});
 
 
                             // re-enabling the swap-columns-button
@@ -153,55 +153,56 @@ define(
                     }
 
 
+                    function hideEmptyRowsOnStartup () {
+
+
+                        // setting how many rows to display
+                        var numberRowsWithValues = (function () {
+
+
+                            var number = 0;
+
+
+                            // cycling through all the problems, getting the highest index of any input that has a value
+                            $(".individual-problem-holder").each(function () {
+                                $(this).find(".problem-input").each(function (index) {
+                                    if ($(this).val()) {
+                                        number = Math.max(number, index);
+                                    }
+                                });
+                            });
+
+
+                            return number + 1; // adding 1 'cause it's 0-indexed
+                        }());
+
+
+                        $("#number-rows-to-show").val(numberRowsWithValues).trigger("change");
+
+
+                        // returning here if no .individual-problem-holders have been added yet
+                        if ($(".individual-problem-holder").length === 0) {
+                            return;
+                        }
+
+
+                        // forcing "sentences" view when there are more than two values set
+                        if (numberRowsWithValues > 2) {
+                            sessionStorage.type = "sentences";
+                        }
+
+
+                        // setting the displayMode
+                        displayMode.set();
+                    };
+
+
                     return {
                         set: set,
-                        toggle: toggle
+                        toggle: toggle,
+                        hideEmptyRowsOnStartup: hideEmptyRowsOnStartup
                     };
                 }());
-
-
-                var hideEmptyRowsOnStartup = function () {
-
-
-                    // setting how many rows to display
-                    var numberRowsWithValues = (function () {
-
-
-                        var number = 0;
-
-
-                        // cycling through all the problems, getting the highest index of any input that has a value
-                        $(".individual-problem-holder").each(function () {
-                            $(this).find(".problem-input").each(function (index) {
-                                if ($(this).val()) {
-                                    number = Math.max(number, index);
-                                }
-                            });
-                        });
-
-
-                        return number + 1; // adding 1 'cause it's 0-indexed
-                    }());
-
-
-                    $("#number-rows-to-show").val(numberRowsWithValues).trigger("change");
-
-
-                    // returning here if no .individual-problem-holders have been added yet
-                    if ($(".individual-problem-holder").length === 0) {
-                        return;
-                    }
-
-
-                    // forcing "sentences" view when there are more than two values set
-                    if (numberRowsWithValues > 2) {
-                        sessionStorage.type = "sentences";
-                    }
-
-
-                    // setting the displayMode
-                    displayMode.set();
-                };
 
 
                 var selected = (function () {
@@ -516,6 +517,7 @@ define(
 
 
                     var unsentChanges = {};
+                    var batchChange = false;
 
 
                     function registerChange() {
@@ -548,11 +550,17 @@ define(
 
 
                         // NEW TEST trying to call the sendChangesToServer function automatically
-                        sendChangesToServer();
+                        if (!batchChange) {
+                            sendChangesToServer();
+                        }
                     }
 
 
                     function sendChangesToServer() {
+
+
+                        // disabling the batchChange mode, so changes now will be send automatically
+                        batchChange = false;
 
 
                         // exiting here if are no changes to upload - if the object is empty
@@ -594,12 +602,8 @@ define(
                         $.post("/update_problem_value", object).done(function (d) {
 
 
-                            // have to parse this as JSON
-                            try {
-                                d = JSON.parse(d);
-                            } catch (e) {
-                                console.log("Couldn't parse d as JSON!");
-                            }
+                            // parse as JSON
+                            d = JSON.parse(d);
 
 
                             // bein' careful
@@ -625,11 +629,9 @@ define(
                                         .addClass("updated");
 
 
-                                // NEW TEST dynamically adding any audio that was returned
-                                if (d.audio) {
-                                    var fileName = d.audio[id];
-                                    problemHolder.addAudio($row, fileName);
-                                }
+                                // dynamically adding any audio that was returned
+                                var fileName = d.audio[id];
+                                problemHolder.addAudio($row, fileName);
                             });
 
 
@@ -652,7 +654,10 @@ define(
 
                     return {
                         registerChange: registerChange,
-                        sendChangesToServer: sendChangesToServer
+                        sendChangesToServer: sendChangesToServer,
+                        setBatchChangeMode: function () {
+                            batchChange = true;
+                        }
                     };
                 }());
 
@@ -881,7 +886,7 @@ define(
 
 
                         // hiding empty rows
-                        hideEmptyRowsOnStartup();
+                        displayMode.hideEmptyRowsOnStartup();
 
 
                         // setting the display mode (words or sentences)
@@ -1047,6 +1052,7 @@ define(
                 // making problems sortable
                 $("#all-problems-holder").sortable({
                     revert: 100,
+                    handle: ".line-number-td",
                     stop: setNewProblemHolderOrder
                 });
 
@@ -1236,10 +1242,16 @@ define(
                 var editor = (function () {
 
 
+                    var clipboard;
+
+
                     var $activeInput;
                     $(document).on("focus", ".problem-input", function () {
+                        $("#copy-button").attr("disabled", false);
                         $activeInput = $(document.activeElement);
-                    });
+                    }).on("blur", ".problem-input"), function () {
+                        $("#copy-button").attr("disabled", true);
+                    };
 
 
                     function newProblem(inputs) {
@@ -1344,22 +1356,22 @@ define(
                     }
 
 
-                    function copyRight() {
-                        makeTheseChanges({
-                            job: "copy_column_right",
-                            thisButton: $(this),
-                            confirmMessage: "Really copy column ",
-                            onFinish: function ($selectedCells) {
-
-
-                                // copying the values from the selected column to the NEXT column
-                                $selectedCells.each(function () {
-                                    var originalValue = $(this).val();
-                                    $(this).next(".problem-input").val(originalValue);
-                                });
-                            }
-                        });
-                    }
+//                    function copyRight() {
+//                        makeTheseChanges({
+//                            job: "copy_column_right",
+//                            thisButton: $(this),
+//                            confirmMessage: "Really copy column ",
+//                            onFinish: function ($selectedCells) {
+//
+//
+//                                // copying the values from the selected column to the NEXT column
+//                                $selectedCells.each(function () {
+//                                    var originalValue = $(this).val();
+//                                    $(this).next(".problem-input").val(originalValue);
+//                                });
+//                            }
+//                        });
+//                    }
 
 
                     function deleteColumn() {
@@ -1374,7 +1386,51 @@ define(
                     }
 
 
+                    function copyColumn() {
+
+                        if ($(".column-copied").length) {
+                            $(".column-copied").removeClass("column-copied");
+                            clipboard = null;
+                            $("#paste-button").attr("disabled", true);
+                            return;
+                        }
+
+                        clipboard = $activeInput.data("column");
+                        $(".problem-input[data-column='" + clipboard + "']").addClass("column-copied");
+                        $("#paste-button").attr("disabled", false);
+                    }
+
+
+                    function pasteColumn() {
+                        var pasteTo = $activeInput.data("column");
+                        makeTheseChanges({
+                            job: "copy_column_to",
+                            confirmMessage: "Copy " + clipboard + " to " + pasteTo + " ?",
+                            data: {
+                                pasteTo: pasteTo,
+                                copyFrom: clipboard
+                            },
+                            onFinish: function ($selectedCells, d) {
+                                $selectedCells.each(function () {
+                                    var newValue = $(this).siblings("[data-column='" + clipboard + "']").val();
+                                    $(this).val(newValue);
+                                });
+                                $(".column-copied").removeClass("column-copied");
+                                clipboard = null;
+                                $("#paste-button").attr("disabled", true);
+                            }
+                        });
+
+                    }
+
+
                     function makeTheseChanges(obj) {
+
+
+                        /*
+                         .ignoreActiveColumn
+                         .
+                         */
 
 
                         // making sure we check that at least one column is active, optionally
@@ -1404,7 +1460,8 @@ define(
                         }
 
 
-                        // adding slight delay to setTimeout so formatting applies BEFORE the confirm
+                        // adding slight delay using setTimeout, so
+                        // formatting applies BEFORE the confirm
                         var sendDataDelay = obj.ignoreActiveColumn ? 0 : 50;
 
 
@@ -1443,9 +1500,11 @@ define(
 
                     return {
                         deleteColumn: deleteColumn,
-                        copyRight: copyRight,
+//                        copyRight: copyRight,
                         swapColumns_1_2: swapColumns_1_2,
-                        newProblem: newProblem
+                        newProblem: newProblem,
+                        copyColumn: copyColumn,
+                        pasteColumn: pasteColumn
                     };
                 }());
 
@@ -1565,6 +1624,7 @@ define(
                 });
                 $(document).on("click", ".clone-button", cloneProblemButtonHandler);
                 $(document).on("change", ".problem-input", updateHandler.registerChange);
+                $(document).on("paste", ".problem-input", pasteFromExcel);
                 $(document).on("keyup", shiftEnterUploadShortcut);
                 $(document).keydown(tabMakesNewRow);
                 $("#group-selector").change(groupSelectorChangeHandler);
@@ -1590,8 +1650,11 @@ define(
                 $("#import-problems-button").click(importProblemsHandler);
                 $("#swap-columns-button").click(editor.swapColumns_1_2);
                 $("#delete-column-button").click(editor.deleteColumn);
-                $("#copy-right-button").click(editor.copyRight);
                 $("#clone-to-different-text-button").click(cloneToDifferentText);
+
+                $("#copy-button").click(editor.copyColumn);
+                $("#paste-button").click(editor.pasteColumn);
+
 
 
                 // wiring up the #import-problems-button to only be enabled when some group is selected
@@ -1602,6 +1665,66 @@ define(
                         $("#import-problems-button").attr("disabled", true);
                     }
                 });
+
+
+                function pasteFromExcel(e) {
+
+
+                    // getting the text data from the clipboardEvent - funky syntax!
+                    // Using <textarea> because it preserves the formatting, with \t and \n
+                    // NOTE that we're not even really appending (or removing) the textarea
+                    var textData = e.originalEvent.clipboardData.getData("text");
+                    var $textArea = $("<textarea style='display: none;' />").val(textData);
+                    textData = $textArea.val();
+
+
+                    // exiting here if there are no line breaks, meaning 
+                    // we're not pasting from Excel
+                    if (textData.indexOf("\n") === -1 && textData.indexOf("\t") === -1) {
+                        return true;
+                    }
+
+
+                    // telling updateHandler NOT to send changes individually
+                    // NOTE we have to call updateHandler.sendChangesToServer() MANUALLY down below
+                    updateHandler.setBatchChangeMode();
+
+
+                    // deleting the originally pasted value
+                    // seems to display better when we blur it first
+                    $(this).blur().val("");
+
+
+                    // saving the current row and the index at which to start
+                    var $currentRow = $(this).closest(".individual-problem-holder");
+                    var cellStartIndex = $(this).index();
+                    var currentIndex = cellStartIndex;
+
+
+                    // cycling through and adding the data
+                    textData.split("\n").forEach(function (thisRow) {
+                        thisRow.split("\t").forEach(function (thisCell) {
+
+
+                            thisCell = thisCell.replace(/\･/g, ""); // removing any little dots
+                            $currentRow.find(".problem-input").eq(currentIndex).val(thisCell).change();
+
+
+                            // setting pointer to next cell
+                            currentIndex += 1;
+                        });
+
+
+                        // resetting the cell index, so we start at the left-most one, 
+                        // and moving the row to the next row
+                        currentIndex = cellStartIndex;
+                        $currentRow = $currentRow.next();
+                    });
+
+
+                    // sending changes to server MANUALLY 
+                    updateHandler.sendChangesToServer();
+                }
 
 
                 function textSelectorChangeHandler() {
@@ -1624,6 +1747,7 @@ define(
 
 
 //                    例えば...
+//                    
 //                    var baseArray = {
 //                        textID: {
 //                            created: {

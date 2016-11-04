@@ -103,7 +103,6 @@ define(
                 });
 
 
-
                 // making the chapter-holders sortable
                 $(".text-holder").sortable({
                     items: ".chapter-holder",

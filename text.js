@@ -19,6 +19,7 @@ define(
                 $(".assignment-button").click(function () {
                     var db_id = $(this).attr("data-db_id");
                     window.location = "/assignment/" + db_id;
+                    sessionStorage.assignmentId = db_id;
                 });
 
 
@@ -145,7 +146,20 @@ define(
                     if ($this.find(".active-assignment").length > 0) {
                         $this.addClass("active-assignment");
                     }
+                });
 
+
+                // wiring up the #open-all-button
+                $("#open-all-button").click(function () {
+
+
+                    if ($(".collapsible").css("display") === "none") {
+                        console.log("Here");
+                        $(".collapsible").addClass("opened").removeClass("closed").slideDown();
+                    } else {
+                        console.log("There");
+                        $(".collapsible").addClass("closed").removeClass("opened").slideUp();
+                    }
                 });
 
 
@@ -166,19 +180,6 @@ define(
                         $(".assignment-button[data-db_id=" + assignment_id + "]").addClass("btn-success");
                     }
                 }
-
-
-                // wiring up the #open-all-button
-                $("#open-all-button").click(function () {
-
-
-                    if ($(".collapsible").css("display") === "none") {
-                        $(".collapsible").addClass("opened").removeClass("closed").slideDown();
-                    } else {
-                        $(".collapsible").addClass("closed").removeClass("opened").slideUp();
-
-                    }
-                });
 
             });
         });

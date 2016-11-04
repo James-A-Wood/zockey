@@ -88,10 +88,6 @@ define(
                     $("#chats-holder").append($message);
 
 
-                    // making sure that we're scrolled all the way down to the bottom
-                    $("#chats-frame").scrollTop($("#chats-frame")[0].scrollHeight);
-
-
                     // enabling the clear-chats-button
                     clearChatsButton.disabled(false);
                 };
@@ -114,8 +110,16 @@ define(
                 $.getJSON("/chat_stuff", dataToSend).done(function (d) {
 
 
-                    // cycling through and displaying each message
-                    d.forEach(displayMessage);
+                    // adding each message, if there are messages to add...
+                    if (d && Array.isArray(d)) {
+                        d.forEach(displayMessage);
+                    }
+
+
+                    // scrolling to the bottom AFTER they've all been added
+                    $("#chats-frame").animate({
+                        scrollTop: $("#chats-frame")[0].scrollHeight
+                    }, 500);
 
                 }).fail(function (d) {
                     console.log(d);
@@ -141,23 +145,25 @@ define(
 
                 // preparing the data to send
                 var dataToSend = {
+                    jobToDo: "upload_new_message",
                     message: message,
-                    sender: "user",
-                    jobToDo: "upload_new_message"
+                    sender: "user"
                 };
 
 
                 // making the ajax request
                 $.getJSON("/chat_stuff", dataToSend).done(function (messages) {
+                    if (messages && Array.isArray(messages)) {
 
+                        messages.forEach(displayMessage);
 
-                    // displaying each message in turn
-                    messages.forEach(displayMessage);
+                        // making sure that we're scrolled all the way down to the bottom
+                        $("#chats-frame").animate({
+                            scrollTop: $("#chats-frame")[0].scrollHeight
+                        }, 200);
+                    }
 
-
-                    // clearing the #message-input
                     $("#message-input").val("").attr({disabled: false});
-
                 }).fail(function (d) {
                     console.log(d);
                 });
@@ -185,8 +191,11 @@ define(
                 // wiring up the chats clearChatsButton, by default
                 $("#clear-chats-button").click(clearChats);
 
+
                 function clearChats() {
 
+
+                    // temporarily disabling the #clear-chats-button
                     $("#clear-chats-button").off("click", clearChats);
 
 
@@ -196,10 +205,11 @@ define(
                     }, function () {
 
 
+                        // re-enabling the #clear-chats-button
                         $("#clear-chats-button").click(clearChats);
 
 
-                        // removing all messages
+                        // removing all messages after fading them out
                         $(".message").fadeTo(400, 0, function () {
                             $(this).remove();
                         });
